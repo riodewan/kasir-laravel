@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import api, { setAccessToken } from '../services/api';
+import api, { setAccessToken, getCsrfCookie, API_BASE_URL } from '../services/api';
 import type { User } from '../types';
 
 type AuthCtx = {
@@ -22,7 +22,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
 
   const fetchUser = async () => {
     try {
-      const { data } = await api.get('/user');
+      const { data } = await api.get('/user', { baseURL: API_BASE_URL, withCredentials: true });
       setUser(data);
     } catch {
       setUser(null);
@@ -34,14 +34,24 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   useEffect(() => { fetchUser(); }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await api.post('/login', { email, password });
+    await getCsrfCookie();
+
+    const res = await api.post(
+      '/login',
+      { email, password },
+      { baseURL: API_BASE_URL, withCredentials: true }
+    );
+
     const t = res?.data?.token || res?.data?.plainTextToken || res?.data?.access_token;
     if (t) setAccessToken(t);
+
     await fetchUser();
   };
 
   const logout = async () => {
-    try { await api.post('/logout'); } catch {}
+    try {
+      await api.post('/logout', {}, { baseURL: API_BASE_URL, withCredentials: true });
+    } catch {}
     setAccessToken(null);
     setUser(null);
   };

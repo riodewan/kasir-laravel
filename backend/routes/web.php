@@ -1,9 +1,12 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
-Route::get('/', function () {
-    return ['Laravel' => app()->version()];
-});
+Route::post('/login', [AuthenticatedSessionController::class, 'store']);
+Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->middleware('auth');
 
-require __DIR__.'/auth.php';
+Route::get('/user', function (Request $request) {
+    return $request->user();
+})->middleware('auth');

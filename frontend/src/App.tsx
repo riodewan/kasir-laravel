@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { AppBar, Toolbar, Button, Box } from '@mui/material';
 import { useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
-import RoleGuard from './components/RoleGuard';
 import LandingTables from './pages/LandingTables';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';

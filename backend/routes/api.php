@@ -9,14 +9,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 // Public
 Route::get('/tables', [TableController::class, 'index']);
 
-// Auth via Breeze API (Sanctum)
-Route::post('/login', [AuthenticatedSessionController::class, 'store']);
-
 Route::middleware('auth:sanctum')->group(function () {
-    // Logout: waiter & cashier
-    Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
-        ->middleware('role:waiter,cashier');
-
     // Foods CRUD: waiter only (ubah ke waiter,cashier jika mau dua-duanya)
     Route::apiResource('foods', FoodController::class)
         ->middleware('role:waiter');
