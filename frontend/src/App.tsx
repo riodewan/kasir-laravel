@@ -1,35 +1,59 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from 'react';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { AppBar, Toolbar, Button, Box } from '@mui/material';
+import { useAuth } from './context/AuthContext';
+import PrivateRoute from './components/PrivateRoute';
+import RoleGuard from './components/RoleGuard';
+import LandingTables from './pages/LandingTables';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import Foods from './pages/Foods';
+import Orders from './pages/Orders';
+import OrderDetail from './pages/OrderDetail';
 
-function App() {
-  const [count, setCount] = useState(0)
-
+const NavBar: React.FC = () => {
+  const { user, logout } = useAuth();
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <AppBar position="sticky" elevation={0}>
+      <Toolbar>
+        <Box sx={{ flexGrow: 1, display:'flex', gap:1 }}>
+          <Button color="inherit" component={Link} to="/">Tables</Button>
+          {user && <Button color="inherit" component={Link} to="/dashboard">Dashboard</Button>}
+          {user && <Button color="inherit" component={Link} to="/orders">Orders</Button>}
+          {user && <Button color="inherit" component={Link} to="/foods">Foods</Button>}
+        </Box>
+        <Box>
+          {!user ? (
+            <Button color="inherit" component={Link} to="/login">Login</Button>
+          ) : (
+            <>
+              <Button disabled color="inherit">{user.role}</Button>
+              <Button color="inherit" onClick={logout}>Logout</Button>
+            </>
+          )}
+        </Box>
+      </Toolbar>
+    </AppBar>
+  );
+};
 
-export default App
+const App: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <NavBar />
+      <Routes>
+        <Route path="/" element={<LandingTables />} />
+        <Route path="/login" element={<Login />} />
+
+        <Route element={<PrivateRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/foods" element={<Foods />} />
+          <Route path="/orders" element={<Orders />} />
+          <Route path="/orders/:id" element={<OrderDetail />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+};
+
+export default App;
