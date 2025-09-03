@@ -10,31 +10,12 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 Route::get('/tables', [TableController::class, 'index']);
 
 Route::middleware('auth:sanctum')->group(function () {
-    // Foods CRUD: waiter only (ubah ke waiter,cashier jika mau dua-duanya)
-    Route::apiResource('foods', FoodController::class)
-        ->middleware('role:waiter');
-
-    // Orders list: waiter & cashier
-    Route::get('/orders', [OrderController::class, 'index'])
-        ->middleware('role:waiter,cashier');
-
-    // Open order: waiter only (sesuai user story)
-    Route::post('/orders/open', [OrderController::class, 'open'])
-        ->middleware('role:waiter');
-
-    // Order detail: waiter & cashier
-    Route::get('/orders/{order}', [OrderController::class, 'show'])
-        ->middleware('role:waiter,cashier');
-
-    // Add item to order: waiter only
-    Route::post('/orders/{order}/items', [OrderController::class, 'addItem'])
-        ->middleware('role:waiter');
-
-    // Close order: waiter & cashier (keduanya boleh menutup)
-    Route::post('/orders/{order}/close', [OrderController::class, 'close'])
-        ->middleware('role:waiter,cashier');
-
-    // Receipt PDF: cashier only (umumnya kasir yang cetak struk)
-    Route::get('/orders/{order}/receipt', [OrderController::class, 'receipt'])
-        ->middleware('role:cashier');
+    Route::apiResource('foods', FoodController::class)->middleware('role:waiter');
+    Route::get('/orders', [OrderController::class,'index'])->middleware('role:waiter,cashier');
+    Route::post('/orders/open', [OrderController::class,'open'])->middleware('role:waiter');
+    Route::get('/orders/{order}', [OrderController::class,'show'])->middleware('role:waiter,cashier');
+    Route::post('/orders/{order}/items', [OrderController::class,'addItem'])->middleware('role:waiter');
+    Route::post('/orders/{order}/close', [OrderController::class,'close'])->middleware('role:waiter,cashier');
+    Route::get('/orders/{order}/receipt', [OrderController::class,'receipt'])->middleware('role:cashier');
 });
+

@@ -4,8 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Food;
 use Illuminate\Http\JsonResponse;
-use App\Http\Requests\FoodStoreRequest;
-use App\Http\Requests\FoodUpdateRequest;
+use Illuminate\Http\Response;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class FoodController extends Controller
 {
@@ -15,7 +16,7 @@ class FoodController extends Controller
     public function index(): JsonResponse
     {
         $foods = Food::query()
-            ->latest()
+            ->orderByDesc('id')
             ->paginate(20);
 
         return response()->json([
@@ -27,13 +28,19 @@ class FoodController extends Controller
     /**
      * POST /api/foods
      */
-    public function store(FoodStoreRequest $request): JsonResponse
+    public function store(Request $request): JsonResponse
     {
-        $food = Food::create($request->validated());
+        $data = $request->validate([
+            'name'     => ['required','string','max:100', Rule::unique('foods','name')],
+            'price'    => ['required','numeric','min:0'],
+            'category' => ['nullable','string','max:100'],
+        ]);
+
+        $food = Food::create($data);
 
         return response()->json([
             'message' => 'Food created successfully.',
-            'data'    => $food,
+            'data'    => $food->fresh(),
         ], 201);
     }
 
@@ -51,9 +58,18 @@ class FoodController extends Controller
     /**
      * PUT/PATCH /api/foods/{food}
      */
-    public function update(FoodUpdateRequest $request, Food $food): JsonResponse
+    public function update(Request $request, Food $food): JsonResponse
     {
-        $food->update($request->validated());
+        $data = $request->validate([
+            'name'     => ['sometimes','string','max:100', Rule::unique('foods','name')->ignore($food->id)],
+            'price'    => ['sometimes','numeric','min:0'],
+            'category' => ['sometimes','nullable','string','max:100'],
+        ]);
+
+        $food->fill($data);
+        if ($food->isDirty()) {
+            $food->save();
+        }
 
         return response()->json([
             'message' => 'Food updated successfully.',
@@ -64,12 +80,9 @@ class FoodController extends Controller
     /**
      * DELETE /api/foods/{food}
      */
-    public function destroy(Food $food): JsonResponse
+    public function destroy(Food $food): Response
     {
         $food->delete();
-
-        return response()->json([
-            'message' => 'Food deleted successfully.',
-        ], 204);
+        return response()->noContent();
     }
 }

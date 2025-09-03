@@ -10,20 +10,17 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Barryvdh\DomPDF\Facade\Pdf;
-use App\Http\Requests\OrderOpenRequest;
-use App\Http\Requests\OrderAddItemRequest;
 
 class OrderController extends Controller
 {
     /**
      * GET /api/orders
-     * Eager-load to avoid N+1.
      */
     public function index(): JsonResponse
     {
         $orders = Order::query()
             ->with(['table', 'items.food'])
-            ->latest()
+            ->orderByDesc('id')
             ->paginate(20);
 
         return response()->json([
@@ -35,17 +32,21 @@ class OrderController extends Controller
     /**
      * POST /api/orders/open
      * Body: { "table_id": number }
-     * Uses transaction + row-level lock to ensure table availability.
      */
-    public function open(OrderOpenRequest $request): JsonResponse
+    public function open(Request $request): JsonResponse
     {
-        $payload = $request->validated();
+        $payload = $request->validate([
+            'table_id' => ['required','integer','exists:tables,id'],
+        ]);
 
         $order = DB::transaction(function () use ($payload) {
-            /** @var Table $table */
+            /** @var Table|null $table */
             $table = Table::lockForUpdate()->find($payload['table_id']);
             abort_if(!$table, 404, 'Table not found.');
             abort_if($table->status !== 'available', 422, 'Table is not available.');
+
+            $hasOpen = Order::where('table_id', $table->id)->where('status', 'open')->exists();
+            abort_if($hasOpen, 422, 'An open order already exists for this table.');
 
             $order = Order::create([
                 'table_id' => $table->id,
@@ -80,29 +81,32 @@ class OrderController extends Controller
     /**
      * POST /api/orders/{order}/items
      * Body: { "food_id": number, "quantity": number }
-     * Uses transaction; recompute total safely in DB.
      */
-    public function addItem(OrderAddItemRequest $request, Order $order): JsonResponse
+    public function addItem(Request $request, Order $order): JsonResponse
     {
-        abort_if($order->status !== 'open', 422, 'Order already closed.');
-
-        $payload = $request->validated();
+        $payload = $request->validate([
+            'food_id'  => ['required','integer','exists:foods,id'],
+            'quantity' => ['required','integer','min:1'],
+        ]);
 
         $order = DB::transaction(function () use ($order, $payload) {
+            /** @var Order $locked */
+            $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+            abort_if($locked->status !== 'open', 422, 'Order already closed.');
+
             $food = Food::findOrFail($payload['food_id']);
 
             OrderItem::create([
-                'order_id' => $order->id,
+                'order_id' => $locked->id,
                 'food_id'  => $food->id,
-                'quantity' => $payload['quantity'],
-                'price'    => $food->price, // snapshot price
+                'quantity' => (int) $payload['quantity'],
+                'price'    => $food->price, // snapshot
             ]);
 
-            // Recalculate total (in DB to avoid race conditions)
-            $total = $order->items()->sum(DB::raw('quantity * price'));
-            $order->update(['total' => $total]);
+            $total = $locked->items()->sum(DB::raw('quantity * price'));
+            $locked->update(['total' => $total]);
 
-            return $order->fresh()->load(['table', 'items.food']);
+            return $locked->fresh()->load(['table', 'items.food']);
         });
 
         return response()->json([
@@ -113,22 +117,23 @@ class OrderController extends Controller
 
     /**
      * POST /api/orders/{order}/close
-     * Optional: protect with role middleware (e.g., cashier only).
      */
     public function close(Order $order): JsonResponse
     {
-        abort_if($order->status !== 'open', 422, 'Order already closed.');
-
         $order = DB::transaction(function () use ($order) {
-            $total = $order->items()->sum(DB::raw('quantity * price'));
-            $order->update([
+            /** @var Order $locked */
+            $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+            abort_if($locked->status !== 'open', 422, 'Order already closed.');
+
+            $total = $locked->items()->sum(DB::raw('quantity * price'));
+            $locked->update([
                 'status' => 'closed',
                 'total'  => $total,
             ]);
 
-            $order->table()->update(['status' => 'available']);
+            $locked->table()->update(['status' => 'available']);
 
-            return $order->fresh()->load(['table', 'items.food']);
+            return $locked->fresh()->load(['table', 'items.food']);
         });
 
         return response()->json([
@@ -139,10 +144,11 @@ class OrderController extends Controller
 
     /**
      * GET /api/orders/{order}/receipt
-     * Returns PDF download.
      */
     public function receipt(Order $order)
     {
+        abort_if($order->status !== 'closed', 422, 'Receipt is available only for closed orders.');
+
         $order->load(['table', 'items.food']);
 
         $pdf = Pdf::loadView('pdf.receipt', ['order' => $order]);
