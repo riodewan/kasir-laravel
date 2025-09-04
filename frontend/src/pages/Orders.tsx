@@ -3,11 +3,13 @@ import api from '../services/api';
 import type { ApiList, Order } from '../types';
 import {
   Container, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Button, Chip, Stack, Box, Skeleton, Alert, ToggleButton, ToggleButtonGroup, Divider, IconButton, Tooltip
+  Button, Chip, Stack, Box, Skeleton, Alert, ToggleButton, ToggleButtonGroup, Divider, IconButton, Tooltip, Card, CardContent
 } from '@mui/material';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 type Filter = 'all' | 'open' | 'closed';
 
@@ -17,6 +19,10 @@ const Orders: React.FC = () => {
   const [err, setErr] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const nav = useNavigate();
+
+  const theme = useTheme();
+  const smDown = useMediaQuery(theme.breakpoints.down('sm'));
+  const mdUp = useMediaQuery(theme.breakpoints.up('md'));
 
   const load = async () => {
     setErr(null);
@@ -40,7 +46,7 @@ const Orders: React.FC = () => {
     return rows.filter(r => r.status === filter);
   }, [rows, filter]);
 
-  // Urutkan terbaru dulu: pakai created_at desc; fallback ke id desc kalau created_at tidak ada
+  // Urutkan terbaru dulu (created_at desc, fallback id desc)
   const list = useMemo(() => {
     const getTime = (x: any) => (x?.created_at ? new Date(x.created_at).getTime() : 0);
     return [...filtered].sort((a, b) => {
@@ -66,17 +72,25 @@ const Orders: React.FC = () => {
   );
 
   return (
-    <Container sx={{ py: 4 }}>
+    <Container sx={{ py: { xs: 2.5, sm: 4 } }}>
       {/* Header */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={2}
+        sx={{ flexWrap: 'wrap', gap: 1 }}
+      >
         <Stack spacing={0.5}>
           <Stack direction="row" alignItems="center" spacing={1}>
             <ListAltIcon />
-            <Typography variant="h4" fontWeight={800}>Orders</Typography>
+            <Typography variant="h4" fontWeight={800} sx={{ fontSize: { xs: 22, sm: 28 } }}>
+              Orders
+            </Typography>
           </Stack>
           <Typography variant="body2" color="text.secondary">Track and manage orders</Typography>
         </Stack>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
           <ToggleButtonGroup
             value={filter}
             exclusive
@@ -88,7 +102,9 @@ const Orders: React.FC = () => {
             <ToggleButton value="open">Open</ToggleButton>
             <ToggleButton value="closed">Closed</ToggleButton>
           </ToggleButtonGroup>
-          <Tooltip title="Refresh"><span><IconButton onClick={load} disabled={loading}><RefreshIcon /></IconButton></span></Tooltip>
+          <Tooltip title="Refresh">
+            <span><IconButton onClick={load} disabled={loading}><RefreshIcon /></IconButton></span>
+          </Tooltip>
         </Stack>
       </Stack>
 
@@ -96,55 +112,110 @@ const Orders: React.FC = () => {
 
       {/* Summary */}
       <Paper sx={{ p: 2, borderRadius: 3, mb: 2 }}>
-        <Stack direction="row" spacing={2} divider={<Divider flexItem orientation="vertical" />} justifyContent="space-between">
+        <Stack
+          direction="row"
+          spacing={2}
+          divider={<Divider flexItem orientation="vertical" />}
+          justifyContent="space-between"
+          sx={{ flexWrap: 'wrap', rowGap: 1 }}
+        >
           <Stack><Typography color="text.secondary">Open</Typography><Typography variant="h6" fontWeight={900}>{stat.open}</Typography></Stack>
           <Stack><Typography color="text.secondary">Closed</Typography><Typography variant="h6" fontWeight={900}>{stat.closed}</Typography></Stack>
           <Stack><Typography color="text.secondary">Total</Typography><Typography variant="h6" fontWeight={900}>{stat.total}</Typography></Stack>
         </Stack>
       </Paper>
 
-      {/* Table */}
-      <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell width={60}>No</TableCell>
-              <TableCell>Table</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell align="right">Total</TableCell>
-              <TableCell align="right" width={120}>Action</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton width={24} /></TableCell>
-                  <TableCell><Skeleton width={80} /></TableCell>
-                  <TableCell><Skeleton width={60} /></TableCell>
-                  <TableCell align="right"><Skeleton width={80} /></TableCell>
-                  <TableCell align="right"><Skeleton width={80} /></TableCell>
+      {/* Content */}
+      {mdUp ? (
+        // ===== Desktop/Tablet: TABLE =====
+        <TableContainer component={Paper} sx={{ borderRadius: 3 }}>
+          <Box sx={{ overflowX: 'auto' }}>
+            <Table sx={{ minWidth: 640 }}>
+              <TableHead>
+                <TableRow>
+                  <TableCell width={60}>No</TableCell>
+                  <TableCell>Table</TableCell>
+                  <TableCell>Status</TableCell>
+                  <TableCell align="right">Total</TableCell>
+                  <TableCell align="right" width={120}>Action</TableCell>
                 </TableRow>
-              ))
-            ) : list.length ? (
-              list.map((r, idx) => (
-                <TableRow key={r.id} hover>
-                  {/* Gunakan startNo + idx + 1 jika pakai pagination server */}
-                  <TableCell>{idx + 1}</TableCell>
-                  <TableCell>#{r.table?.number ?? r.table_id}</TableCell>
-                  <TableCell><StatusChip s={r.status} /></TableCell>
-                  <TableCell align="right">{r.total?.toLocaleString('id-ID')}</TableCell>
-                  <TableCell align="right">
-                    <Button size="small" onClick={()=>nav(`/orders/${r.id}`)}>Detail</Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow><TableCell colSpan={5} align="center">No data</TableCell></TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+              </TableHead>
+              <TableBody>
+                {loading ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton width={24} /></TableCell>
+                      <TableCell><Skeleton width={80} /></TableCell>
+                      <TableCell><Skeleton width={60} /></TableCell>
+                      <TableCell align="right"><Skeleton width={80} /></TableCell>
+                      <TableCell align="right"><Skeleton width={80} /></TableCell>
+                    </TableRow>
+                  ))
+                ) : list.length ? (
+                  list.map((r, idx) => (
+                    <TableRow key={r.id} hover>
+                      <TableCell>{idx + 1}</TableCell>
+                      <TableCell>#{r.table?.number ?? r.table_id}</TableCell>
+                      <TableCell><StatusChip s={r.status} /></TableCell>
+                      <TableCell align="right">{r.total?.toLocaleString('id-ID')}</TableCell>
+                      <TableCell align="right">
+                        <Button size="small" onClick={()=>nav(`/orders/${r.id}`)}>Detail</Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow><TableCell colSpan={5} align="center">No data</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Box>
+        </TableContainer>
+      ) : (
+        // ===== Mobile: CARDS =====
+        <Stack spacing={1.25}>
+          {loading ? (
+            Array.from({ length: 6 }).map((_, i) => (
+              <Card key={i} sx={{ borderRadius: 3 }}>
+                <CardContent>
+                  <Skeleton width="30%" />
+                  <Skeleton width="55%" />
+                  <Skeleton width="40%" />
+                </CardContent>
+              </Card>
+            ))
+          ) : list.length ? (
+            list.map((r, idx) => (
+              <Card key={r.id} sx={{ borderRadius: 3 }}>
+                <CardContent>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center">
+                    <Typography variant="subtitle2" color="text.secondary">No</Typography>
+                    <Typography fontWeight={800}>{idx + 1}</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.5}>
+                    <Typography color="text.secondary">Table</Typography>
+                    <Typography fontWeight={700}>#{r.table?.number ?? r.table_id}</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.5}>
+                    <Typography color="text.secondary">Status</Typography>
+                    <StatusChip s={r.status} />
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between" alignItems="center" mt={0.5} mb={1}>
+                    <Typography color="text.secondary">Total</Typography>
+                    <Typography fontWeight={800}>{r.total?.toLocaleString('id-ID')}</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="flex-end">
+                    <Button size="small" variant="contained" onClick={()=>nav(`/orders/${r.id}`)}>
+                      Detail
+                    </Button>
+                  </Stack>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Box textAlign="center" py={6} color="text.secondary">No data</Box>
+          )}
+        </Stack>
+      )}
     </Container>
   );
 };

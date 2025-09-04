@@ -2,24 +2,19 @@ import React, { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
 import type { TableRow } from '../types';
 import {
-  Container, Typography, Card, CardContent, Chip, Button, Stack, Alert, Box, TextField,
-  InputAdornment, IconButton, Tooltip, Divider, Paper
+  Container, Typography, Card, CardContent, Chip, Button, Stack, Alert, Box, Divider, Paper, IconButton, Tooltip
 } from '@mui/material';
 import { GridLegacy as Grid } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import SummarizeRounded from '@mui/icons-material/SummarizeRounded';
 import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import RoleGuard from '../components/RoleGuard';
 import { useNavigate } from 'react-router-dom';
-
-type StatusFilter = 'all' | 'available' | 'occupied';
 
 const Dashboard: React.FC = () => {
   const [tables, setTables] = useState<TableRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [q, setQ] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('all');
   const nav = useNavigate();
 
   const load = async () => {
@@ -36,6 +31,12 @@ const Dashboard: React.FC = () => {
   };
   useEffect(() => { load(); }, []);
 
+  const stat = useMemo(() => ({
+    available: tables.filter(t => t.status === 'available').length,
+    occupied: tables.filter(t => t.status === 'occupied').length,
+    total: tables.length,
+  }), [tables]);
+
   const openOrder = async (tableId: number) => {
     try {
       const res = await api.post('/orders/open', { table_id: tableId });
@@ -47,111 +48,104 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const filtered = useMemo(() => {
-    const qn = q.trim().toLowerCase();
-    const byS = status === 'all' ? tables : tables.filter(t => t.status === status);
-    if (!qn) return byS;
-    return byS.filter(t => String(t.number).toLowerCase().includes(qn));
-  }, [tables, q, status]);
-
-  const stat = useMemo(() => ({
-    available: tables.filter(t => t.status === 'available').length,
-    occupied: tables.filter(t => t.status === 'occupied').length,
-    total: tables.length
-  }), [tables]);
-
   const Tile: React.FC<{ t: TableRow }> = ({ t }) => (
     <Card
       elevation={0}
       sx={{
-        borderRadius: 2,
-        height: 84,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        bgcolor: t.status === 'available' ? 'success.light' : 'grey.400',
-        color: t.status === 'available' ? 'common.white' : 'grey.900',
-        cursor: t.status === 'available' ? 'pointer' : 'not-allowed',
+        borderRadius: 3,
+        p: 2,
+        height: 140,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        bgcolor: t.status === 'available' ? 'success.light' : 'grey.200',
+        color: t.status === 'available' ? 'common.white' : 'text.primary',
+        backgroundImage: t.status === 'available'
+          ? 'linear-gradient(135deg, rgba(255,255,255,.08), rgba(0,0,0,.08))'
+          : 'none',
         transition: 'transform .12s ease, box-shadow .12s ease',
-        '&:hover': t.status === 'available' ? { transform: 'translateY(-2px)', boxShadow: 3 } : undefined
+        '@media (hover:hover)': { '&:hover': { transform: 'translateY(-2px)' } }
       }}
-      onClick={() => t.status === 'available' && openOrder(t.id)}
     >
-      <Stack alignItems="center" spacing={0.5}>
-        <Typography fontWeight={800}>#{t.number}</Typography>
-        <Chip size="small" label={t.status === 'available' ? 'Available' : 'Occupied'}
-              color={t.status === 'available' ? 'success' : 'warning'}
-              variant={t.status === 'available' ? 'filled' : 'outlined'} />
+      <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Typography variant="h6" fontWeight={900}>Table #{t.number}</Typography>
+        <Chip
+          label={t.status}
+          color={t.status === 'available' ? 'success' : 'warning'}
+          size="small"
+          variant={t.status === 'available' ? 'filled' : 'outlined'}
+          sx={{ bgcolor: t.status === 'available' ? 'rgba(255,255,255,.25)' : undefined }}
+        />
       </Stack>
+
+      <RoleGuard allow={['waiter']}>
+        <Button
+          onClick={() => openOrder(t.id)}
+          variant="contained"
+          disabled={t.status !== 'available'}
+          sx={{ textTransform: 'none', alignSelf: 'flex-end' }}
+        >
+          Open Order
+        </Button>
+      </RoleGuard>
     </Card>
   );
 
   return (
-    <Container sx={{ py: 4 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+    <Container sx={{ py: { xs: 2.5, sm: 4 } }}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={2}
+        sx={{ flexWrap: 'wrap', gap: 1 }}
+      >
         <Stack spacing={0.5}>
-          <Typography variant="h4" fontWeight={800}>Table Management</Typography>
-          <Typography variant="body2" color="text.secondary">Floor plan & quick stats</Typography>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <TableRestaurantIcon />
+            <Typography variant="h4" fontWeight={800} sx={{ fontSize: { xs: 22, sm: 28 } }}>
+              Dashboard
+            </Typography>
+          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            Quick overview & open orders
+          </Typography>
         </Stack>
-        <Stack direction="row" spacing={1}>
-          <TextField
-            size="small" placeholder="Search table…"
-            value={q} onChange={(e)=>setQ(e.target.value)}
-            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
-          />
-          <Tooltip title="Refresh">
-            <span><IconButton onClick={load} disabled={loading}><RefreshIcon /></IconButton></span>
-          </Tooltip>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Tooltip title="Refresh"><span><IconButton onClick={load} disabled={loading}><RefreshIcon /></IconButton></span></Tooltip>
+          <Button
+            startIcon={<SummarizeRounded />}
+            variant="outlined"
+            onClick={() => nav('/orders')}
+            sx={{ textTransform: 'none' }}
+          >
+            View Orders
+          </Button>
         </Stack>
       </Stack>
 
       {err && <Alert severity="error" sx={{ mb: 2 }}>{err}</Alert>}
 
+      {/* Summary */}
       <Paper sx={{ p: 2, borderRadius: 3, mb: 2 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1.5}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Button variant={status==='all'?'contained':'outlined'} size="small" onClick={()=>setStatus('all')}>All</Button>
-            <Button variant={status==='available'?'contained':'outlined'} size="small" onClick={()=>setStatus('available')}>Available</Button>
-            <Button variant={status==='occupied'?'contained':'outlined'} size="small" onClick={()=>setStatus('occupied')}>Occupied</Button>
-          </Stack>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <Stack direction="row" spacing={1} alignItems="center"><Chip size="small" color="success" label="Available" /> <Typography variant="caption">= free</Typography></Stack>
-            <Stack direction="row" spacing={1} alignItems="center"><Chip size="small" color="warning" label="Occupied" /> <Typography variant="caption">= in use</Typography></Stack>
-          </Stack>
+        <Stack direction="row" justifyContent="space-between" sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+          <Stack><Typography color="text.secondary">Available</Typography><Typography variant="h6" fontWeight={900}>{stat.available}</Typography></Stack>
+          <Stack><Typography color="text.secondary">Occupied</Typography><Typography variant="h6" fontWeight={900}>{stat.occupied}</Typography></Stack>
+          <Stack><Typography color="text.secondary">Total</Typography><Typography variant="h6" fontWeight={900}>{stat.total}</Typography></Stack>
         </Stack>
+        <Divider sx={{ mt: 1.5 }} />
       </Paper>
 
+      {/* Grid */}
       <Grid container spacing={2}>
-        {/* grid (left 9) */}
-        <Grid item xs={12} md={9}>
-          <Card sx={{ p: 2, borderRadius: 3 }}>
-            <Grid container spacing={1.5}>
-              {filtered.map(t => (
-                <Grid key={t.id} item xs={4} sm={3} md={2}>
-                  <Tile t={t} />
-                </Grid>
-              ))}
-              {filtered.length === 0 && (
-                <Grid item xs={12}><Box textAlign="center" py={6} color="text.secondary">No tables</Box></Grid>
-              )}
-            </Grid>
-          </Card>
-        </Grid>
-
-        {/* quick stats (right 3) */}
-        <Grid item xs={12} md={3}>
-          <Card sx={{ p: 2, borderRadius: 3 }}>
-            <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
-              <TableRestaurantIcon />
-              <Typography fontWeight={700}>Quick Stats</Typography>
-            </Stack>
-            <Divider sx={{ mb: 1.5 }} />
-            <Stack spacing={1.25}>
-              <Stack direction="row" justifyContent="space-between"><Typography>Available</Typography><Typography fontWeight={700}>{stat.available}</Typography></Stack>
-              <Stack direction="row" justifyContent="space-between"><Typography>Occupied</Typography><Typography fontWeight={700}>{stat.occupied}</Typography></Stack>
-              <Divider />
-              <Stack direction="row" justifyContent="space-between"><Typography>Total</Typography><Typography fontWeight={800}>{stat.total}</Typography></Stack>
-            </Stack>
-          </Card>
-        </Grid>
+        {tables.map(t => (
+          <Grid key={t.id} item xs={12} sm={6} md={4} lg={3}>
+            <Tile t={t} />
+          </Grid>
+        ))}
+        {!tables.length && (
+          <Grid item xs={12}><Box textAlign="center" color="text.secondary" py={6}>No tables</Box></Grid>
+        )}
       </Grid>
     </Container>
   );

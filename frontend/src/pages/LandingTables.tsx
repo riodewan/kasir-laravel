@@ -3,18 +3,24 @@ import api from '../services/api';
 import type { TableRow } from '../types';
 import {
   Typography, Card, CardContent, Chip, Box, Stack, TextField,
-  InputAdornment, Skeleton, Alert, Paper, IconButton, Tooltip, Divider, Container
+  InputAdornment, Skeleton, Alert, Divider, Container, IconButton, Tooltip
 } from '@mui/material';
 import { GridLegacy as Grid } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import TableRestaurantIcon from '@mui/icons-material/TableRestaurant';
+import { useTheme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 const LandingTables: React.FC = () => {
   const [tables, setTables] = useState<TableRow[]>([]);
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+
+  const theme = useTheme();
+  const smDown = useMediaQuery(theme.breakpoints.down('sm'));
+  const mdDown = useMediaQuery(theme.breakpoints.down('md'));
 
   const load = async () => {
     setErr(null);
@@ -56,11 +62,14 @@ const LandingTables: React.FC = () => {
       elevation={0}
       sx={{
         borderRadius: 2,
-        height: 84,
+        height: { xs: 88, sm: 96, md: 104 },
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         bgcolor: t.status === 'available' ? 'success.light' : 'grey.400',
         color: t.status === 'available' ? 'common.white' : 'grey.900',
         transition: 'transform .12s ease, box-shadow .12s ease',
+        '@media (hover:hover)': {
+          '&:hover': { transform: 'translateY(-2px)' }
+        }
       }}
     >
       <Stack alignItems="center" spacing={0.5}>
@@ -70,29 +79,42 @@ const LandingTables: React.FC = () => {
     </Card>
   );
 
+  // Skeleton responsif: lebih sedikit di layar kecil biar ringan
+  const skeletonCount = smDown ? 8 : mdDown ? 12 : 18;
+
   return (
-    <Container sx={{ py: 4 }}>
+    <Container sx={{ py: { xs: 2.5, sm: 4 } }}>
       {/* Header */}
       <Stack spacing={0.5} mb={2}>
-        <Typography variant="h4" fontWeight={800}>Table List</Typography>
+        <Typography variant="h4" fontWeight={800} sx={{ fontSize: { xs: 22, sm: 28 } }}>
+          Table List
+        </Typography>
         <Typography variant="body2" color="text.secondary">
           Browse table availability before signing in
         </Typography>
       </Stack>
 
-      <Stack direction="row" alignItems="center" gap={1} mb={2}>
+      {/* Controls */}
+      <Stack
+        direction="row"
+        alignItems="center"
+        gap={1}
+        mb={2}
+        sx={{ flexWrap: 'wrap' }}
+      >
         <TextField
           placeholder="Search table number…"
           value={q}
           onChange={(e)=>setQ(e.target.value)}
           size="small"
-          sx={{ maxWidth: 360 }}
+          sx={{ width: { xs: '100%', sm: 360 } }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
                 <SearchIcon fontSize="small" />
               </InputAdornment>
             ),
+            'aria-label': 'Search tables by number'
           }}
         />
         <Tooltip title="Refresh">
@@ -105,33 +127,8 @@ const LandingTables: React.FC = () => {
       {err && <Alert severity="error" sx={{ mb: 2 }}>{err}</Alert>}
 
       <Grid container spacing={2}>
-        {/* left grid */}
-        <Grid item xs={12} md={9}>
-          <Card sx={{ p: 2, borderRadius: 3 }}>
-            <Grid container spacing={1.5}>
-              {loading ? (
-                Array.from({ length: 18 }).map((_, i) => (
-                  <Grid key={i} item xs={4} sm={3} md={2}>
-                    <Card sx={{ borderRadius: 2, p: 1 }}><Skeleton variant="rounded" height={64} /></Card>
-                  </Grid>
-                ))
-              ) : filtered.length ? (
-                filtered.map(t => (
-                  <Grid key={t.id} item xs={4} sm={3} md={2}>
-                    <Tile t={t} />
-                  </Grid>
-                ))
-              ) : (
-                <Grid item xs={12}>
-                  <Box textAlign="center" py={6} color="text.secondary">No tables</Box>
-                </Grid>
-              )}
-            </Grid>
-          </Card>
-        </Grid>
-
-        {/* right quick stats */}
-        <Grid item xs={12} md={3}>
+        {/* Right quick stats (mobile: pindah ke atas) */}
+        <Grid item xs={12} md={3} sx={{ order: { xs: -1, md: 0 } }}>
           <Card sx={{ p: 2, borderRadius: 3 }}>
             <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
               <TableRestaurantIcon />
@@ -153,6 +150,33 @@ const LandingTables: React.FC = () => {
                 <Typography fontWeight={800}>{stat.total}</Typography>
               </Stack>
             </Stack>
+          </Card>
+        </Grid>
+
+        {/* Left grid */}
+        <Grid item xs={12} md={9}>
+          <Card sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 3 }}>
+            <Grid container spacing={1.5}>
+              {loading ? (
+                Array.from({ length: skeletonCount }).map((_, i) => (
+                  <Grid key={i} item xs={6} sm={4} md={3} lg={2}>
+                    <Card sx={{ borderRadius: 2, p: 1 }}>
+                      <Skeleton variant="rounded" height={64} />
+                    </Card>
+                  </Grid>
+                ))
+              ) : filtered.length ? (
+                filtered.map(t => (
+                  <Grid key={t.id} item xs={6} sm={4} md={3} lg={2}>
+                    <Tile t={t} />
+                  </Grid>
+                ))
+              ) : (
+                <Grid item xs={12}>
+                  <Box textAlign="center" py={6} color="text.secondary">No tables</Box>
+                </Grid>
+              )}
+            </Grid>
           </Card>
         </Grid>
       </Grid>
